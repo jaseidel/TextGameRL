@@ -1,4 +1,5 @@
-"""Linear QL agent"""
+#%%
+# """Linear QL agent"""
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -15,7 +16,7 @@ NUM_RUNS = 10
 NUM_EPOCHS = 600
 NUM_EPIS_TRAIN = 25  # number of episodes for training at each epoch
 NUM_EPIS_TEST = 50  # number of episodes for testing
-ALPHA = 0.001  # learning rate for training
+ALPHA = 0.01  # learning rate for training
 
 ACTIONS = framework.get_actions()
 OBJECTS = framework.get_objects()
@@ -45,8 +46,16 @@ def epsilon_greedy(state_vector, theta, epsilon):
     Returns:
         (int, int): the indices describing the action/object to take
     """
-    # TODO Your code here
-    action_index, object_index = None, None
+    #Test if a random number falls within epsilon
+    if (np.random.random() < epsilon):
+        #Take random action
+        action_index = np.random.randint(NUM_ACTIONS)
+        object_index = np.random.randint(NUM_OBJECTS)
+    else:                                            
+        q_values = theta @ state_vector
+        idx = np.argmax(q_values)
+        action_index, object_index = index2tuple(idx)
+
     return (action_index, object_index)
 # pragma: coderesponse end
 
@@ -68,8 +77,17 @@ def linear_q_learning(theta, current_state_vector, action_index, object_index,
     Returns:
         None
     """
-    # TODO Your code here
-    theta = None # TODO Your update here
+    next_q_vals = theta @ next_state_vector
+    max_next_q_val = np.max(next_q_vals)
+
+    current_q_values = theta @ current_state_vector
+    idx = tuple2index(action_index, object_index)
+    q_value = current_q_values[idx]
+
+    target = reward + GAMMA * max_next_q_val * (1 - terminal)
+
+    theta[idx] = theta[idx] + ALPHA * (
+        target - q_value) * current_state_vector
 # pragma: coderesponse end
 
 
@@ -84,35 +102,38 @@ def run_episode(for_training):
     Returns:
         None
     """
+    epi_reward = 0
+    gamma_factor = 1
     epsilon = TRAINING_EP if for_training else TESTING_EP
-    epi_reward = None
-
-    # initialize for each episode
-    # TODO Your code here
 
     (current_room_desc, current_quest_desc, terminal) = framework.newGame()
+
     while not terminal:
         # Choose next action and execute
         current_state = current_room_desc + current_quest_desc
-        current_state_vector = utils.extract_bow_feature_vector(
-            current_state, dictionary)
-        # TODO Your code here
+        current_state_vector = utils.extract_bow_feature_vector(current_state, dictionary)
+
+        (action_index, object_index) = epsilon_greedy(current_state_vector, theta, epsilon)
+        (next_room_desc, next_quest_desc, reward, terminal) = framework.step_game(current_room_desc, current_quest_desc, action_index, object_index)
 
         if for_training:
             # update Q-function.
-            # TODO Your code here
-            pass
-
-        if not for_training:
+            next_state = next_room_desc + next_quest_desc
+            next_state_vector = utils.extract_bow_feature_vector(next_state, dictionary)
+            linear_q_learning(theta, current_state_vector, action_index, object_index, reward, next_state_vector, terminal)
+        else:
             # update reward
-            # TODO Your code here
-            pass
+            epi_reward = epi_reward + gamma_factor * reward
+            gamma_factor *= GAMMA
+
 
         # prepare next step
-        # TODO Your code here
-
+        current_room_desc = next_room_desc
+        current_quest_desc = next_quest_desc
+        
     if not for_training:
         return epi_reward
+# pragma: coderesponse end
 
 
 def run_epoch():
@@ -169,3 +190,5 @@ if __name__ == '__main__':
     axis.set_title(('Linear: nRuns=%d, Epilon=%.2f, Epi=%d, alpha=%.4f' %
                     (NUM_RUNS, TRAINING_EP, NUM_EPIS_TRAIN, ALPHA)))
 
+
+# %%
